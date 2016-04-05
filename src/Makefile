@@ -1,7 +1,11 @@
-.PHONY: clean
+OBJECTS = lz77.o error.o
 
-all:
-	$(CC) $(CFLAGS) $(LDFLAGS) main.c -o $(EXEC)
+.PHONY: objects clean
+
+all: objects
+	$(CC) $(CFLAGS) $(LDFLAGS) main.c $(OBJECTS) -o $(EXEC)
+
+objects: $(OBJECTS)
 
 clean:
 	rm -f *.o

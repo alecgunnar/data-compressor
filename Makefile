@@ -1,7 +1,7 @@
 export CC      = gcc
 export CFLAGS  = -Wall -pedantic
 export LDFLAGS =
-export EXEC    = acdc
+export EXEC    = kompressor
 
 BUILD_DIR    = build
 SOURCE_DIR   = src
