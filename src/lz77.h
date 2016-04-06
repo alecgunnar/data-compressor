@@ -10,6 +10,13 @@
 
 #define VIEW_SIZE        512
 #define MIN_MATCH_LENGTH 3
+#define MATCH_ALLOC_STEP 16
+
+typedef struct {
+    char cursor;
+    char start;
+    char length;
+} match;
 
 int compress(int input);
 int decompress(int input);

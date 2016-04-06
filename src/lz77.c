@@ -19,15 +19,22 @@ char view[VIEW_SIZE];
 char code[VIEW_SIZE];
 char phrase[VIEW_SIZE];
 
-int view_length = 0;
-int code_length = 0;
-int cursor  = 0;
+match **matches;
 
-int offset = 0;
+int view_length    = 0;
+int code_length    = 0;
+int matches_length = 0;
+int cursor         = 0;
+int offset         = 0;
 
 void compress_view();
 int longest_match();
 int check_phrase(int length);
+void add_match(char cur, char idx, char len);
+void add_match_direct(match *m);
+void write_compressed_data();
+void decompress_code();
+void write_from_code(char start, char length);
 
 int compress (int input) {
     while ((view_length = read(input, &view, VIEW_SIZE)) > 0)
@@ -44,21 +51,18 @@ void compress_view () {
 
     while (cursor < view_length) {
         if ((len = longest_match()) > MIN_MATCH_LENGTH) {
-            // DEBUG
-            // puts(code);
-            // int i;
-            // for (i = 0; i < offset; i++)
-            //     printf(" ");
-            // fflush(stdout);
-            // write(STDOUT_FILENO, view + cursor, len);
-            // printf("<%d, %d, %d>\n", code_length - 1, offset, len);
-            // DEBUG
-
+            add_match(code_length - 1, offset, len);
             cursor += len;
         } else {
             code[code_length++] = view[cursor++];
         }
     }
+
+    add_match(0, 0, 0);
+
+    write_compressed_data();
+
+    free(matches);
 }
 
 int longest_match () {
@@ -94,6 +98,95 @@ int check_phrase (int length) {
     return 0;
 }
 
+void write_compressed_data () {
+    char coded_len = (char) code_length;
+
+    if (write(STDOUT_FILENO, &coded_len, sizeof(char)) < 0)
+        error("Could not write code length");
+
+    if (write(STDOUT_FILENO, code, code_length) < 0)
+        error("Could not write coded data");
+
+    int i;
+
+    for (i = 0; i < matches_length; i++) {
+        if (write(STDOUT_FILENO, matches[i], sizeof(match)) < 0)
+            error("Could not write match data");
+
+        free(matches[i]);
+    }
+
+    matches_length = 0;
+}
+
 int decompress (int input) {
-    return 0;
+    while (1) {
+        if (read(input, &code_length, sizeof(char)) <= 0)
+            break;
+
+        if (read(input, code, sizeof(char) * code_length) < 0)
+            error("Could not read coded data");
+
+        match *new_match;
+
+        do { 
+            new_match = malloc(sizeof(match));
+
+            if (read(input, new_match, sizeof(match)) < 0)
+                error("Could not read match data");
+
+            add_match_direct(new_match);
+        } while (new_match->length > 0);
+
+        decompress_code();
+
+        free(matches);
+    }
+
+    return 1;
+}
+
+void decompress_code () {
+    int i;
+
+    cursor = 0;
+
+    for (i = 0; i < matches_length; i++) {
+        if (!matches[i]->length)
+            continue;
+
+        if (cursor < matches[i]->cursor) {
+            write_from_code(cursor, matches[i]->cursor - cursor + 1);
+            cursor = matches[i]->cursor + 1;
+        }
+
+        write_from_code(matches[i]->start, matches[i]->length);
+
+        free(matches[i]);
+    }
+
+    if (cursor < code_length)
+        write_from_code(cursor, code_length - cursor);
+}
+
+void write_from_code (char start, char length) {
+    // printf("<%d, %d>", start, length);
+    if (write(STDOUT_FILENO, code + start, sizeof(char) * length) < 0)
+        error("Could not write from code");
+}
+
+void add_match (char cur, char idx, char len) {
+    match *new_match  = malloc(sizeof(match));
+    new_match->cursor = cur;
+    new_match->start  = idx;
+    new_match->length = len;
+
+    add_match_direct(new_match);
+}
+
+void add_match_direct (match *m) {
+    if (matches_length % MATCH_ALLOC_STEP == 0)
+        matches = realloc(matches, (matches_length + MATCH_ALLOC_STEP) * sizeof(match));
+
+    matches[matches_length++] = m;
 }
