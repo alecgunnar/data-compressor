@@ -6,6 +6,7 @@
 //
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -14,91 +15,83 @@
 #include "lz77.h"
 #include "error.h"
 
-byte window[WINDOW_SIZE];
-byte buffer[BUFFER_SIZE];
-byte phrase[WINDOW_SIZE];
+char view[VIEW_SIZE];
+char code[VIEW_SIZE];
+char phrase[VIEW_SIZE];
 
-match *matches;
+int view_length = 0;
+int code_length = 0;
+int cursor  = 0;
 
-int window_length = 0;
-int phrase_length = 0;
+int offset = 0;
 
-void push_byte(byte push);
-int check_phrase();
-void shift_window();
+void compress_view();
+int longest_match();
+int check_phrase(int length);
 
 int compress (int input) {
-    int i, read_len = 0;
+    while ((view_length = read(input, &view, VIEW_SIZE)) > 0)
+        compress_view();
 
-    while ((read_len = read(input, &buffer, BUFFER_SIZE)) > 0)
-        for (i = 0; i < read_len; i++)
-            push_byte(buffer[i]);
-
-    if (read_len < 0)
+    if (view_length < 0)
         error("Could not read in data file.");
 
     return 1;
 }
 
-void push_byte (byte push) {
-    phrase[phrase_length++] = push;
-    phrase[phrase_length]   = 0;
+void compress_view () {
+    int len;
 
-    if (!check_phrase()) {
-        shift_window();
-        phrase_length = 0;
+    while (cursor < view_length) {
+        if ((len = longest_match()) > MIN_MATCH_LENGTH) {
+            // DEBUG
+            // puts(code);
+            // int i;
+            // for (i = 0; i < offset; i++)
+            //     printf(" ");
+            // fflush(stdout);
+            // write(STDOUT_FILENO, view + cursor, len);
+            // printf("<%d, %d, %d>\n", code_length - 1, offset, len);
+            // DEBUG
+
+            cursor += len;
+        } else {
+            code[code_length++] = view[cursor++];
+        }
     }
 }
 
-int check_phrase () {
-    static int running_match = 0;
-    int offset = 0, index;
+int longest_match () {
+    int length = 0;
 
-    printf("[%s] => [%s]\n", phrase, window);
+    while (check_phrase(++length) > 0);
 
-    while ((offset + phrase_length - 1) < window_length) {
-        for (index = 0; index < phrase_length; index++)
-            if (phrase[index] != window[offset + index])
+    return length;
+}
+
+int check_phrase (int length) {
+    static int check_offset = 0;
+    int index;
+
+    if (length == 1)
+        check_offset = 0;
+
+    while ((check_offset + length) < code_length) {
+        for (index = 0; index < length; index++)
+            if (code[check_offset + index] != view[cursor + index])
                 break;
 
-        if (index == phrase_length) {
-            running_match = 1;
-            return 1;
+        if (index == length) {
+            if (code[check_offset + index] != view[cursor + index])
+                return 0;
+
+            return (offset = check_offset);
         }
 
-        offset++;
-    }
-
-    if (running_match && phrase_length > MIN_MATCH_LENGTH) {
-        phrase[0]     = phrase[phrase_length - 1];
-        phrase_length = 1;
-        running_match = 0;
-
-        puts("MATCH!");
-
-        return 1;
+        check_offset++;
     }
 
     return 0;
-}
-
-void shift_window () {
-    int i;
-
-    if ((window_length + phrase_length) > WINDOW_SIZE) {
-        if (write(STDOUT_FILENO, window, phrase_length) < 0)
-            error("Cannot write");
-
-        for (i = 0; i < window_length; i++)
-            window[i] = window[i + phrase_length];
-
-        window_length -= phrase_length;
-    }
-
-    memcpy(window + window_length, phrase, phrase_length);
-
-    window_length += phrase_length;
-    phrase_length  = 0;
 }
 
 int decompress (int input) {
