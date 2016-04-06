@@ -52,6 +52,7 @@ void compress_view () {
     while (cursor < view_length) {
         if ((len = longest_match()) > MIN_MATCH_LENGTH) {
             add_match(code_length - 1, offset, len);
+
             cursor += len;
         } else {
             code[code_length++] = view[cursor++];
@@ -61,8 +62,6 @@ void compress_view () {
     add_match(0, 0, 0);
 
     write_compressed_data();
-
-    free(matches);
 }
 
 int longest_match () {
@@ -99,7 +98,7 @@ int check_phrase (int length) {
 }
 
 void write_compressed_data () {
-    char coded_len = (char) code_length;
+    unsigned char coded_len = (unsigned char) code_length;
 
     if (write(STDOUT_FILENO, &coded_len, sizeof(char)) < 0)
         error("Could not write code length");
@@ -113,10 +112,15 @@ void write_compressed_data () {
         if (write(STDOUT_FILENO, matches[i], sizeof(match)) < 0)
             error("Could not write match data");
 
-        free(matches[i]);
+        // free(matches[i]);
     }
 
     matches_length = 0;
+    code_length    = 0;
+    cursor         = 0;
+
+    free(matches);
+    matches = NULL;
 }
 
 int decompress (int input) {
@@ -161,8 +165,6 @@ void decompress_code () {
         }
 
         write_from_code(matches[i]->start, matches[i]->length);
-
-        free(matches[i]);
     }
 
     if (cursor < code_length)
@@ -170,7 +172,6 @@ void decompress_code () {
 }
 
 void write_from_code (char start, char length) {
-    // printf("<%d, %d>", start, length);
     if (write(STDOUT_FILENO, code + start, sizeof(char) * length) < 0)
         error("Could not write from code");
 }
