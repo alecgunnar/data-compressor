@@ -16,7 +16,7 @@
 
 const char *EXEC_NAME;
 
-int input_file;
+FILE *input_file;
 
 int do_compressor();
 int do_decompressor();
@@ -29,9 +29,9 @@ int main (int argc, char **argv) {
     if (argc < 2)
         exit(help());
 
-    input_file = STDIN_FILENO;
+    input_file = stdin;
 
-    if (argc == 3 && (input_file = open(argv[2], O_RDONLY, S_IREAD)) < 0)
+    if (argc == 3 && (input_file = fopen(argv[2], "r")))
         error("Could not open input file");
 
     exit(run_cmd(argv[1]) == 0);
@@ -45,8 +45,8 @@ int run_cmd (char *cmd) {
             return decompress(input_file);
     }
 
-    if (input_file != STDIN_FILENO)
-        close(input_file);
+    if (input_file != stdin)
+        fclose(input_file);
 
     return help();
 }

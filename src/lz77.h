@@ -5,20 +5,25 @@
 // @date   April 3, 2016
 //
 
+#include <limits.h>
+
 #ifndef LZ77_H
 #define LZ77_H 1
 
-#define VIEW_SIZE        256
-#define MIN_MATCH_LENGTH 3
-#define MATCH_ALLOC_STEP 16
+#define VIEW_SIZE         CHAR_MAX
+#define PHRASE_SIZE       CHAR_MAX
+#define MIN_PHRASE_LENGTH 3
+#define MATCH_ALLOC_STEP  16
+
+typedef char byte;
 
 typedef struct {
-    unsigned char cursor;
-    unsigned char start;
-    unsigned char length;
+    byte cursor;
+    byte start;
+    byte length;
 } match;
 
-int compress(int input);
-int decompress(int input);
+int compress();
+int decompress();
 
 #endif

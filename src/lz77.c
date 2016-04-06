@@ -7,187 +7,116 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include <fcntl.h>
-#include <unistd.h>
 #include <string.h>
 
 #include "lz77.h"
 #include "error.h"
 
-char view[VIEW_SIZE];
-char code[VIEW_SIZE];
-char phrase[VIEW_SIZE];
+// External variables
+extern FILE *input_file;
 
-match **matches;
+// Global variables
+byte view[VIEW_SIZE];
+byte code[VIEW_SIZE];
+byte phrase[PHRASE_SIZE];
 
-int view_length    = 0;
-int code_length    = 0;
-int matches_length = 0;
-int cursor         = 0;
-int offset         = 0;
+int view_length = 0;
+int code_length = 0;
+int cursor      = 0;
 
-void compress_view();
-int longest_match();
-int check_phrase(int length);
-void add_match(char cur, char idx, char len);
-void add_match_direct(match *m);
-void write_compressed_data();
-void decompress_code();
-void write_from_code(char start, char length);
+byte phrase_offset = 0;
 
-int compress (int input) {
-    while ((view_length = read(input, &view, VIEW_SIZE)) > 0)
-        compress_view();
+// Prototypes
+void process_view();
+int longest_phrase();
+int index_of();
+long int input_size();
 
-    if (view_length < 0)
-        error("Could not read in data file.");
+int compress () {
+    while ((view_length = fread(view, sizeof(byte), VIEW_SIZE, input_file)) > 0)
+        process_view();
 
     return 1;
 }
 
-void compress_view () {
-    int len;
+void process_view () {
+    int length;
 
     while (cursor < view_length) {
-        if ((len = longest_match()) > MIN_MATCH_LENGTH) {
-            add_match(code_length - 1, offset, len);
+        length = longest_phrase();
 
-            cursor += len;
+        if (length >= MIN_PHRASE_LENGTH) {
+            putchar(-1 * phrase_offset);
+            putchar(length);
+            cursor += length;
         } else {
-            code[code_length++] = view[cursor++];
-        }
-    }
-
-    add_match(0, 0, 0);
-
-    write_compressed_data();
-}
-
-int longest_match () {
-    int length = 0;
-
-    while (check_phrase(++length) > 0);
-
-    return length;
-}
-
-int check_phrase (int length) {
-    static int check_offset = 0;
-    int index;
-
-    if (length == 1)
-        check_offset = 0;
-
-    while ((check_offset + length) < code_length) {
-        for (index = 0; index < length; index++)
-            if (code[check_offset + index] != view[cursor + index])
-                break;
-
-        if (index == length) {
-            if (code[check_offset + index] != view[cursor + index])
-                return 0;
-
-            return (offset = check_offset);
+            putchar(code[code_length++] = view[cursor++]);
         }
 
-        check_offset++;
+        fflush(stdout);
     }
 
-    return 0;
+    cursor      = 0;
+    code_length = 0;
 }
 
-void write_compressed_data () {
-    unsigned char coded_len = (unsigned char) code_length;
+int longest_phrase () {
+    int offset, length = 0;
 
-    if (write(STDOUT_FILENO, &coded_len, sizeof(char)) < 0)
-        error("Could not write code length");
+    while (length < PHRASE_SIZE && (length < (view_length - cursor))) {
+        phrase[length]   = view[cursor + length];
+        phrase[++length] = 0;
 
-    if (write(STDOUT_FILENO, code, code_length) < 0)
-        error("Could not write coded data");
-
-    int i;
-
-    for (i = 0; i < matches_length; i++) {
-        if (write(STDOUT_FILENO, matches[i], sizeof(match)) < 0)
-            error("Could not write match data");
-
-        // free(matches[i]);
-    }
-
-    matches_length = 0;
-    code_length    = 0;
-    cursor         = 0;
-
-    free(matches);
-    matches = NULL;
-}
-
-int decompress (int input) {
-    while (1) {
-        if (read(input, &code_length, sizeof(char)) <= 0)
+        if ((offset = index_of()) < 0)
             break;
 
-        if (read(input, code, sizeof(char) * code_length) < 0)
-            error("Could not read coded data");
+        phrase_offset = offset;
+    }
 
-        match *new_match;
+    return --length;
+}
 
-        do { 
-            new_match = malloc(sizeof(match));
+int index_of () {
+    char *loc = strstr(code, phrase);
 
-            if (read(input, new_match, sizeof(match)) < 0)
-                error("Could not read match data");
+    if (loc == NULL)
+        return -1;
 
-            add_match_direct(new_match);
-        } while (new_match->length > 0);
+    return loc - code;
+}
 
-        decompress_code();
+int decompress () {
+    long int size = input_size();
+    char c, n;
 
-        free(matches);
+    while(ftell(stdin) < size) {
+        c = getc(input_file);
+
+        if (c < 0) {
+            n = getc(input_file);
+
+            memcpy(view + view_length, code + (-1 * c), n);
+            view_length += n;
+        } else {
+            view[view_length++] = c;
+            code[code_length++] = c;
+        }
+
+        if (view_length == VIEW_SIZE || ftell(stdin) == size) {
+            printf("%s", view);
+            fflush(stdout);
+
+            memset(view, 0, VIEW_SIZE);
+            view_length = code_length = 0;
+        }
     }
 
     return 1;
 }
 
-void decompress_code () {
-    int i;
-
-    cursor = 0;
-
-    for (i = 0; i < matches_length; i++) {
-        if (!matches[i]->length)
-            continue;
-
-        if (cursor < matches[i]->cursor) {
-            write_from_code(cursor, matches[i]->cursor - cursor + 1);
-            cursor = matches[i]->cursor + 1;
-        }
-
-        write_from_code(matches[i]->start, matches[i]->length);
-    }
-
-    if (cursor < code_length)
-        write_from_code(cursor, code_length - cursor);
-}
-
-void write_from_code (char start, char length) {
-    if (write(STDOUT_FILENO, code + start, sizeof(char) * length) < 0)
-        error("Could not write from code");
-}
-
-void add_match (char cur, char idx, char len) {
-    match *new_match  = malloc(sizeof(match));
-    new_match->cursor = cur;
-    new_match->start  = idx;
-    new_match->length = len;
-
-    add_match_direct(new_match);
-}
-
-void add_match_direct (match *m) {
-    if (matches_length % MATCH_ALLOC_STEP == 0)
-        matches = realloc(matches, (matches_length + MATCH_ALLOC_STEP) * sizeof(match));
-
-    matches[matches_length++] = m;
+long int input_size () {
+    fseek(input_file, 0, SEEK_END);
+    long int size = ftell(input_file);
+    fseek(input_file, 0, SEEK_SET);
+    return size;
 }
