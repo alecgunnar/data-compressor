@@ -1,4 +1,4 @@
-OBJECTS = lz77.o error.o
+OBJECTS = boyer_moore.o lzss.o error.o
 
 .PHONY: objects clean
 

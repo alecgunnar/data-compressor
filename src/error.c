@@ -1,7 +1,7 @@
 //
 // Data Compression Project -- CS 4310
 //
-// @author Alec Carpenter <alecgunnar@wmich.edu>
+// @author Alec Carpenter <alecgunnar@gmail.com>
 // @date   April 3, 2016
 //
 

@@ -1,7 +1,7 @@
 //
 // Data Compression Project -- CS 4310
 //
-// @author Alec Carpenter <alecgunnar@wmich.edu>
+// @author Alec Carpenter <alecgunnar@gmail.com>
 // @date   April 3, 2016
 //
 
@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "lz77.h"
+#include "lzss.h"
 #include "error.h"
 
 const char *EXEC_NAME;
@@ -31,22 +31,24 @@ int main (int argc, char **argv) {
 
     input_file = stdin;
 
-    if (argc == 3 && (input_file = fopen(argv[2], "r")))
+    if (argc == 3 && (input_file = fopen(argv[2], "r")) == NULL)
         error("Could not open input file");
 
-    exit(run_cmd(argv[1]) == 0);
+    int status = run_cmd(argv[1]) == 0;
+
+    if (input_file != stdin)
+        fclose(input_file);
+
+    exit(status);
 }
 
 int run_cmd (char *cmd) {
     switch (cmd[0]) {
         case 'c':
-            return compress(input_file);
+            return compress();
         case 'd':
-            return decompress(input_file);
+            return decompress();
     }
-
-    if (input_file != stdin)
-        fclose(input_file);
 
     return help();
 }

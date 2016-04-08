@@ -3,13 +3,19 @@ export CFLAGS  = -Wall -pedantic
 export LDFLAGS =
 export EXEC    = kompressor
 
-BUILD_DIR    = build
-SOURCE_DIR   = src
+export BUILD_DIR  = build
+export SOURCE_DIR = src
+export TEST_DIR   = test
+
 INSTALL_PATH = /usr/local/bin
 
-.PHONY: clean build install uninstall
+.PHONY: test build install uninstall clean
 
 all: build
+
+test:
+	make -C $(SOURCE_DIR)
+	make -C $(TEST_DIR)
 
 build:
 	mkdir -p $(BUILD_DIR)
@@ -24,4 +30,5 @@ uninstall:
 
 clean:
 	make -C $(SOURCE_DIR) clean
+	make -C $(TEST_DIR) clean
 	rm -f $(BUILD_DIR)$(EXEC)
