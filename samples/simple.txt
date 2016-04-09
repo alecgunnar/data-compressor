@@ -1,1 +1,0 @@
-This is a simple file for the compressor to compress.
