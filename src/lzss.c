@@ -32,10 +32,10 @@ int finished_reading = 0;
 
 // Prototypes
 void write_prefix_match_data(byte length);
-void fill_buffer();
 int longest_prefix();
 int prefix_offset(int length);
 void shift_window(int length);
+void fill_buffer();
 
 // Start-up and shutdown functions
 
@@ -67,13 +67,10 @@ int compress () {
 
     while (buffer_length > 0) {
         length = longest_prefix();
-// printf("[%s]\n", window);
-        if (length >= MINIMUM_PREFIX_LENGTH) {
-            // printf("<%d, %d>", last_offset, length);
 
+        if (length > MINIMUM_PREFIX_LENGTH) {
             write_prefix_match_data(length);
-
-            shift_window(length);
+            shift_window(length - 1);
         } else {
             putchar(buffer[0]);
             shift_window(1);

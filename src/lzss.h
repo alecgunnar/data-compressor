@@ -15,7 +15,7 @@
 #endif
 
 #define BUFFER_SIZE           CHAR_MAX
-#define MINIMUM_PREFIX_LENGTH 3
+#define MINIMUM_PREFIX_LENGTH 2
 #define MATCH_ALLOC_STEP      16
 
 typedef char byte;
